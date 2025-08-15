@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -17,6 +16,13 @@ datasource db {
 model Account {
   id             String   @id @default(uuid())
   userId         String   @unique
-  walletId       String?
-  lagoCustomerId String?  @unique
+  walletId       String
+  lagoCustomerId String   @unique
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  name           String   
+  description    String
+
 }
