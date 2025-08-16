@@ -7,6 +7,7 @@ import {
   Delete,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -21,6 +22,8 @@ import {
 } from '@nestjs/swagger';
 import { Product } from '@prisma/client';
 import { GetProductsDto } from './dto/get-products.dto';
+import { AuthGuard } from '@nestjs/passport';
+import { AdminGuard } from 'src/shared/guards/admin.guard';
 
 @ApiTags('products')
 @Controller('products')
@@ -28,6 +31,7 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Post()
+  @UseGuards(AuthGuard('jwt'), AdminGuard)
   @ApiOperation({ summary: 'Create product' })
   @ApiCreatedResponse({ type: Object, description: 'Created product' })
   @ApiBody({ type: CreateProductDto })
@@ -62,6 +66,7 @@ export class ProductController {
   }
 
   @Patch(':id')
+  @UseGuards(AuthGuard('jwt'), AdminGuard)
   @ApiOperation({ summary: 'Update product' })
   @ApiParam({ name: 'id', description: 'UUID of the product' })
   @ApiOkResponse({ type: Object, description: 'Updated product' })
@@ -74,6 +79,7 @@ export class ProductController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'), AdminGuard)
   @ApiOperation({ summary: 'Delete product' })
   @ApiParam({ name: 'id', description: 'UUID of the product' })
   @ApiOkResponse({ type: Object, description: 'Deleted product' })
