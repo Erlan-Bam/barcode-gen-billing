@@ -17,6 +17,6 @@ export class BillingController {
     return this.billingService.buyBarcodes(data);
   }
 
-  @Post('check')
+  @Post('check-credits')
   async checkAccount(@User('id') userId: string) {}
 }
