@@ -77,4 +77,8 @@ export class BillingService {
     }
     return await this.lago.getCredits(account);
   }
+
+  async checkCoupon(code: string) {
+    return await this.lago.checkCoupon(code);
+  }
 }

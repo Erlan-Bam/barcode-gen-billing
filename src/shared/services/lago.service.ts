@@ -1,6 +1,6 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { Account } from '@prisma/client';
-import { Client, getLagoError } from 'lago-javascript-client';
+import { Client, CouponObject, getLagoError } from 'lago-javascript-client';
 
 @Injectable()
 export class LagoService {
@@ -15,6 +15,14 @@ export class LagoService {
     }
 
     this.lago = Client(LAGO_API_KEY, { baseUrl: LAGO_URL });
+  }
+  private isExpired(coupon: CouponObject): boolean {
+    if (coupon.terminated_at) return true;
+
+    if (coupon.expiration === 'time_limit' && coupon.expiration_at) {
+      return new Date(coupon.expiration_at).getTime() <= Date.now();
+    }
+    return false;
   }
 
   async addOns(code: string, account: Account) {
@@ -86,12 +94,47 @@ export class LagoService {
       }
     }
   }
+
   async getCredits(account: Account) {
     try {
       const { data } = await this.lago.wallets.findWallet(account.walletId);
       return { credits: data.wallet.credits_balance };
     } catch (error) {
-      this.logger.error('Error occured in top up wallet', error);
+      this.logger.error(
+        `Error occured in get credits of walletId: ${account.walletId}`,
+        error,
+      );
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async checkCoupon(code: string) {
+    try {
+      const { data } = await this.lago.coupons.findCoupon(code);
+      if (this.isExpired(data.coupon)) {
+        throw new HttpException('This coupon is expired', 400);
+      }
+      return {
+        coupon: {
+          name: data.coupon.name,
+          description: data.coupon.description,
+          code: data.coupon.code,
+          type: data.coupon.coupon_type,
+          planCodes: data.coupon.plan_codes,
+          reusable: data.coupon.reusable,
+          percentageRate: data.coupon.percentage_rate,
+          frequency: data.coupon.frequency,
+          frequencyDuration: data.coupon.frequency_duration,
+          expirationAt: data.coupon.expiration_at,
+        },
+      };
+    } catch (error) {
+      const lagoError =
+        await getLagoError<typeof this.lago.coupons.findCoupon>(error);
+      if (lagoError?.error === 'Not Found') {
+        throw new HttpException('Coupon not found', 404);
+      }
+      this.logger.error('Error occurred in check coupon', error);
       throw new HttpException('Bad request', 400);
     }
   }

@@ -1,4 +1,12 @@
-import { Body, Controller, Logger, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from 'src/shared/decorator/user.decorator';
 import { PrismaService } from 'src/shared/services/prisma.service';
@@ -17,7 +25,12 @@ export class BillingController {
     return this.billingService.buyBarcodes(data);
   }
 
-  @Post('check-credits')
+  @Post('check/coupon/:code')
+  async checkCoupon(@Param('code') code: string) {
+    return this.billingService.checkCoupon(code);
+  }
+
+  @Get('check/credits')
   async checkAccount(@User('id') userId: string) {
     return this.billingService.checkCredits(userId);
   }
