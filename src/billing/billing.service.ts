@@ -66,4 +66,15 @@ export class BillingService {
       throw new HttpException('Something went wrong', 500);
     }
   }
+
+  async checkCredits(userId: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { userId: userId },
+    });
+    if (!account) {
+      this.logger.debug(`Account for user with id: ${userId} was not found!`);
+      throw new HttpException('Account not found', 404);
+    }
+    return await this.lago.getCredits(account);
+  }
 }

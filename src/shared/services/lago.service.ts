@@ -86,4 +86,13 @@ export class LagoService {
       }
     }
   }
+  async getCredits(account: Account) {
+    try {
+      const { data } = await this.lago.wallets.findWallet(account.walletId);
+      return { credits: data.wallet.credits_balance };
+    } catch (error) {
+      this.logger.error('Error occured in top up wallet', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
 }

@@ -18,5 +18,7 @@ export class BillingController {
   }
 
   @Post('check-credits')
-  async checkAccount(@User('id') userId: string) {}
+  async checkAccount(@User('id') userId: string) {
+    return this.billingService.checkCredits(userId);
+  }
 }
