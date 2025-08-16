@@ -17,7 +17,7 @@ export class BuyBarcodesDto {
 
   @Type(() => Number)
   @IsInt()
-  credits: number;
+  index: number;
 
   userId!: string;
 }

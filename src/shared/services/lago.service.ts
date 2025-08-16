@@ -49,7 +49,7 @@ export class LagoService {
         await this.lago.walletTransactions.createWalletTransaction({
           wallet_transaction: {
             wallet_id: account.walletId,
-            paid_credits: `${value}`,
+            granted_credits: `${value}`,
           },
         });
       return data.wallet_transactions;

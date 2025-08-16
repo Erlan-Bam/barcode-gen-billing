@@ -12,9 +12,40 @@ export class BillingService {
   ) {}
   async buyBarcodes(data: BuyBarcodesDto) {
     try {
-      const account = await this.prisma.account.findUnique({
-        where: { userId: data.userId },
-      });
+      const [account, product] = await this.prisma.$transaction([
+        this.prisma.account.findUnique({
+          where: { userId: data.userId },
+        }),
+        this.prisma.product.findFirst({
+          where: {
+            name: {
+              contains: 'barcode',
+              mode: 'insensitive',
+            },
+          },
+        }),
+      ]);
+      type PackageItem = { credits: number; price: number };
+
+      let packages: PackageItem[];
+      try {
+        const raw = product.packages;
+
+        if (typeof raw === 'string') {
+          packages = JSON.parse(raw) as PackageItem[];
+        } else {
+          packages = raw as unknown as PackageItem[];
+        }
+      } catch (error) {
+        throw new HttpException(
+          `Error parsing packages for product: ${product.name}`,
+          500,
+        );
+      }
+      if (data.index < 0 || data.index >= packages.length) {
+        throw new HttpException('Invalid package index is out of scope', 400);
+      }
+
       if (!account) {
         this.logger.debug(
           `Account for user with id: ${data.userId} was not found!`,
@@ -22,9 +53,9 @@ export class BillingService {
         throw new HttpException('Account not found', 404);
       }
       if (data.type === BuyType.SINGLE) {
-        await this.lago.addOns(data.code, account);
+        await this.lago.topUpWallet(packages[0].credits, account);
       } else if (data.type === BuyType.PACKAGE) {
-        await this.lago.topUpWallet(data.credits, account);
+        await this.lago.topUpWallet(packages[data.index].credits, account);
       } else {
         await this.lago.subscriptionPlan(data.code, account);
       }
