@@ -1,14 +1,14 @@
 import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from './shared/services/prisma.service';
-import { KafkaService } from './shared/services/kafka.service';
+import { HealthService } from './kafka/services/health.service';
 
 @ApiTags('health')
 @Controller()
 export class AppController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly kafka: KafkaService,
+    private readonly kafka: HealthService,
   ) {}
 
   @ApiOperation({ summary: 'Liveness probe' })
@@ -28,6 +28,12 @@ export class AppController {
       db = 'error';
     }
 
+    let lago: 'ok' | 'error' = 'ok';
+    try {
+    } catch {
+      lago = 'error';
+    }
+
     let kafka: 'ok' | 'error' = 'ok';
     try {
       await this.kafka.checkHealth();
@@ -35,12 +41,12 @@ export class AppController {
       kafka = 'error';
     }
 
-    const allOk = [db, kafka].every((x) => x === 'ok');
+    const allOk = [db, kafka, lago].every((x) => x === 'ok');
     const status = allOk ? 'ready' : 'error';
 
     if (!allOk) {
       throw new HttpException(
-        { status, database: db, kafka },
+        { status, database: db, kafka: kafka, lago: lago },
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }

@@ -42,7 +42,7 @@ export class LagoService {
     } catch (error) {
       const lagoError =
         await getLagoError<typeof this.lago.addOns.findAddOn>(error);
-      if (lagoError.error === 'Not Found') {
+      if (lagoError?.error === 'Not Found') {
         throw new HttpException('Add ons not found', 404);
       } else {
         this.logger.error('Error occured in barcode add ons', error);
@@ -86,7 +86,7 @@ export class LagoService {
         await getLagoError<typeof this.lago.subscriptions.createSubscription>(
           error,
         );
-      if (lagoError.error === 'Not Found') {
+      if (lagoError?.error === 'Not Found') {
         throw new HttpException('Plan not found', 404);
       } else {
         this.logger.error('Error occured in barcode add ons', error);
@@ -135,6 +135,58 @@ export class LagoService {
         throw new HttpException('Coupon not found', 404);
       }
       this.logger.error('Error occurred in check coupon', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async spendBarcodeCredits(account: Account, credits: number) {
+    try {
+      const { data } =
+        await this.lago.walletTransactions.createWalletTransaction({
+          wallet_transaction: {
+            wallet_id: account.walletId,
+            voided_credits: `${credits}`,
+          },
+        });
+      return data.wallet_transactions;
+    } catch (error) {
+      this.logger.error('Error occured in top up wallet', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async payBarcodeCredits(account: Account, credits: number) {
+    try {
+      const { data } =
+        await this.lago.walletTransactions.createWalletTransaction({
+          wallet_transaction: {
+            wallet_id: account.walletId,
+            paid_credits: `${credits}`,
+          },
+        });
+      return data.wallet_transactions;
+    } catch (error) {
+      this.logger.error('Error occured in top up wallet', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async hasActiveSubscription(account: Account): Promise<boolean> {
+    try {
+      const { data } = await this.lago.subscriptions.findAllSubscriptions({
+        external_customer_id: account.id,
+      });
+      return data.subscriptions ? true : false;
+    } catch (error) {
+      const lagoError =
+        await getLagoError<typeof this.lago.subscriptions.findAllSubscriptions>(
+          error,
+        );
+
+      if (lagoError?.status === 404 || lagoError?.error === 'Not Found')
+        return false;
+
+      this.logger.error('Error checking subscriptions', error);
       throw new HttpException('Bad request', 400);
     }
   }
