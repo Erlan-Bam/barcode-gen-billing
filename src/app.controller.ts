@@ -2,6 +2,7 @@ import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PrismaService } from './shared/services/prisma.service';
 import { HealthService } from './kafka/services/health.service';
+import { LagoService } from './shared/services/lago.service';
 
 @ApiTags('health')
 @Controller()
@@ -9,6 +10,7 @@ export class AppController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly kafka: HealthService,
+    private readonly lago: LagoService,
   ) {}
 
   @ApiOperation({ summary: 'Liveness probe' })
@@ -30,6 +32,7 @@ export class AppController {
 
     let lago: 'ok' | 'error' = 'ok';
     try {
+      await this.lago.checkHealth();
     } catch {
       lago = 'error';
     }

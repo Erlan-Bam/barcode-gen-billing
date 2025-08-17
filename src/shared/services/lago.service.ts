@@ -190,4 +190,23 @@ export class LagoService {
       throw new HttpException('Bad request', 400);
     }
   }
+
+  async checkHealth(): Promise<'ok' | 'error'> {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 3000);
+
+    try {
+      await this.lago.addOns.findAllAddOns(
+        { per_page: 1, page: 1 },
+        { signal: ac.signal },
+      );
+
+      return 'ok';
+    } catch (error: any) {
+      this.logger.error('Lago health check failed', error);
+      return 'error';
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }
