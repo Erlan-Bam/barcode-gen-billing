@@ -2,6 +2,9 @@ import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { LagoService } from 'src/shared/services/lago.service';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { BuyBarcodesDto, BuyType } from './dto/buy-barcodes.dto';
+import { CalculatePriceDto } from './dto/calculate-price.dto';
+import { Product } from '@prisma/client';
+import { CouponObject } from 'lago-javascript-client';
 
 @Injectable()
 export class BillingService {
@@ -25,23 +28,12 @@ export class BillingService {
           },
         }),
       ]);
-      type PackageItem = { credits: number; price: number };
-
-      let packages: PackageItem[];
-      try {
-        const raw = product.packages;
-
-        if (typeof raw === 'string') {
-          packages = JSON.parse(raw) as PackageItem[];
-        } else {
-          packages = raw as unknown as PackageItem[];
-        }
-      } catch (error) {
-        throw new HttpException(
-          `Error parsing packages for product: ${product.name}`,
-          500,
-        );
+      if (!product) {
+        this.logger.error(`Product with name barcode was not found`);
+        throw new HttpException('Product not found', 500);
       }
+
+      const { packages } = await this.getPackages(product);
       if (data.index < 0 || data.index >= packages.length) {
         throw new HttpException('Invalid package index is out of scope', 400);
       }
@@ -80,5 +72,81 @@ export class BillingService {
 
   async checkCoupon(code: string) {
     return await this.lago.checkCoupon(code);
+  }
+
+  async calculatePrice(data: CalculatePriceDto) {
+    try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: data.productId },
+      });
+      if (!product) {
+        throw new HttpException('Product not found', 404);
+      }
+      let basePrice = 0;
+      if (data.packageIndex) {
+        const { packages } = await this.getPackages(product);
+        if (data.packageIndex < 0 || data.packageIndex >= packages.length) {
+          throw new HttpException(
+            'Invalid package packageIndex is out of scope',
+            400,
+          );
+        }
+        if (data.packageIndex < 0 || data.packageIndex >= packages.length) {
+          throw new HttpException(
+            'Invalid package packageIndex is out of scope',
+            400,
+          );
+        }
+
+        basePrice += packages[data.packageIndex].price;
+      }
+      if (data.planCode) {
+        const { plan } = await this.lago.checkPlan(data.planCode);
+        basePrice += plan.amountCents / 100;
+      }
+
+      let totalPrice = basePrice;
+      let appliedCoupon = null;
+      if (data.couponCode) {
+        const { coupon } = await this.lago.checkCoupon(data.couponCode);
+        if (coupon.type === 'fixed_amount') {
+          totalPrice = Math.max(0, basePrice - coupon.amountCents / 100);
+        } else {
+          totalPrice = basePrice * (100 - parseFloat(coupon.percentageRate));
+        }
+        appliedCoupon = coupon;
+      }
+
+      return {
+        totalPrice: totalPrice,
+        basePrice: basePrice,
+        coupon: appliedCoupon,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) return error;
+      this.logger.error('Error occured in buy barcodes:', error);
+      throw new HttpException('Something went wrong', 500);
+    }
+  }
+
+  async getPackages(product: Product) {
+    type PackageItem = { credits: number; price: number };
+
+    let packages: PackageItem[];
+    try {
+      const raw = product.packages;
+
+      if (typeof raw === 'string') {
+        packages = JSON.parse(raw) as PackageItem[];
+      } else {
+        packages = raw as unknown as PackageItem[];
+      }
+    } catch (error) {
+      throw new HttpException(
+        `Error parsing packages for product: ${product.name}`,
+        500,
+      );
+    }
+    return { packages: packages };
   }
 }

@@ -121,6 +121,7 @@ export class LagoService {
           code: data.coupon.code,
           type: data.coupon.coupon_type,
           planCodes: data.coupon.plan_codes,
+          amountCents: data.coupon.amount_cents,
           reusable: data.coupon.reusable,
           percentageRate: data.coupon.percentage_rate,
           frequency: data.coupon.frequency,
@@ -135,6 +136,33 @@ export class LagoService {
         throw new HttpException('Coupon not found', 404);
       }
       this.logger.error('Error occurred in check coupon', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async checkPlan(code: string) {
+    try {
+      const { data } = await this.lago.plans.findPlan(code);
+      return {
+        plan: {
+          name: data.plan.name,
+          description: data.plan.description,
+          code: data.plan.code,
+          interval: data.plan.interval,
+          payInAdvance: data.plan.pay_in_advance,
+          amountCents: data.plan.amount_cents,
+          amountCurrency: data.plan.amount_currency,
+          trialPeriod: data.plan.trial_period,
+          charges: data.plan.charges,
+        },
+      };
+    } catch (error) {
+      const lagoError =
+        await getLagoError<typeof this.lago.plans.findPlan>(error);
+      if (lagoError?.error === 'Not Found') {
+        throw new HttpException('Coupon not found', 404);
+      }
+      this.logger.error('Error occurred in check plan', error);
       throw new HttpException('Bad request', 400);
     }
   }
