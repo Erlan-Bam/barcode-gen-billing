@@ -237,4 +237,75 @@ export class LagoService {
       clearTimeout(timeout);
     }
   }
+
+  async createWallet(accountId: string) {
+    try {
+      const { data } = await this.lago.wallets.createWallet({
+        wallet: {
+          external_customer_id: accountId,
+          name: 'Prepaid',
+          rate_amount: '1',
+          currency: 'USD',
+        },
+      });
+      return data.wallet;
+    } catch (error) {
+      this.logger.error(
+        `Error occured in create wallet for accountId=${accountId}`,
+        error,
+      );
+      throw new Error(
+        `Error occured in create wallet for accountId=${accountId}`,
+      );
+    }
+  }
+
+  async createCustomer(accountId: string) {
+    try {
+      const { data } = await this.lago.customers.createCustomer({
+        customer: {
+          external_id: accountId,
+        },
+      });
+      return data.customer;
+    } catch (error) {
+      throw new Error(
+        `Error occured during customer creation for accountId=${accountId}`,
+      );
+    }
+  }
+
+  async terminateWallet(walletId: string) {
+    try {
+      const { data } = await this.lago.wallets.destroyWallet(walletId);
+      return data.wallet;
+    } catch (error) {
+      this.logger.error(
+        `Error occured in terminate wallet for walletId=${walletId}`,
+        error,
+      );
+      throw new Error(
+        `Error occured in terminate wallet for walletId=${walletId}`,
+      );
+    }
+  }
+
+  async deleteCustomer(customerId: string) {
+    try {
+      const { data } = await this.lago.customers.createCustomer({
+        customer: {
+          external_id: customerId,
+        },
+      });
+      return data.customer;
+    } catch (error) {
+      this.logger.error(
+        `Error occured in delete customer for customerId=${customerId}`,
+        error,
+      );
+      throw new Error(
+        `Error occured during customer creation for customerId=${customerId}`,
+      );
+    }
+  }
 }
