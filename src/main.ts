@@ -5,6 +5,10 @@ import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
+export const clientId = process.env.KAFKA_CLIENT_ID;
+export const brokers = process.env.KAFKA_BROKERS?.split(',');
+export const groupId = process.env.KAFKA_GROUP_ID;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
@@ -12,21 +16,11 @@ async function bootstrap() {
   const kafkaEnabled = process.env.KAFKA_ENABLED === 'true';
 
   if (kafkaEnabled) {
-    const clientId = process.env.KAFKA_CLIENT_ID;
-    const brokersRaw = process.env.KAFKA_BROKERS;
-    const groupId = process.env.KAFKA_GROUP_ID;
-
     if (!clientId) logger.warn('KAFKA_CLIENT_ID not set');
-    if (!brokersRaw) logger.warn('KAFKA_BROKERS not set');
+    if (!brokers) logger.warn('KAFKA_BROKERS not set');
     if (!groupId) logger.warn('KAFKA_GROUP_ID not set');
 
-    if (clientId && brokersRaw && groupId) {
-      const brokers = brokersRaw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      // ✅ Wire the microservice
+    if (clientId && brokers && groupId) {
       app.connectMicroservice<MicroserviceOptions>({
         transport: Transport.KAFKA,
         options: {

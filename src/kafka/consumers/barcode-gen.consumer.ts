@@ -11,8 +11,8 @@ import { LagoService } from 'src/shared/services/lago.service';
 import { PrismaService } from 'src/shared/services/prisma.service';
 
 @Controller()
-export class BarcodeGenController {
-  private readonly logger = new Logger(BarcodeGenController.name);
+export class BarcodeGenConsumer {
+  private readonly logger = new Logger(BarcodeGenConsumer.name);
   constructor(
     private lago: LagoService,
     private prisma: PrismaService,

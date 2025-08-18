@@ -5,6 +5,7 @@ import { BuyBarcodesDto, BuyType } from './dto/buy-barcodes.dto';
 import { CalculatePriceDto } from './dto/calculate-price.dto';
 import { Product } from '@prisma/client';
 import { CouponObject } from 'lago-javascript-client';
+import { BillingProducer } from 'src/kafka/producers/billing.producer';
 
 @Injectable()
 export class BillingService {
@@ -12,6 +13,7 @@ export class BillingService {
   constructor(
     private prisma: PrismaService,
     private lago: LagoService,
+    private producer: BillingProducer,
   ) {}
   async buyBarcodes(data: BuyBarcodesDto) {
     try {
@@ -46,10 +48,50 @@ export class BillingService {
       }
       if (data.type === BuyType.SINGLE) {
         await this.lago.topUpWallet(packages[0].credits, account);
+        try {
+          await this.producer.purchaseSuccess({
+            userId: account.userId,
+            credits: packages[0].credits,
+            price: packages[0].price,
+          });
+        } catch (error) {
+          this.logger.error(
+            'Kafka emitting even purchaseSuccess failed for single',
+            error,
+          );
+        }
       } else if (data.type === BuyType.PACKAGE) {
         await this.lago.topUpWallet(packages[data.index].credits, account);
+        try {
+          await this.producer.purchaseSuccess({
+            userId: account.userId,
+            credits: packages[data.index].credits,
+            price: packages[data.index].price,
+          });
+        } catch (error) {
+          this.logger.error(
+            'Kafka emitting even purchaseSuccess failed for package',
+            error,
+          );
+        }
       } else {
-        await this.lago.subscriptionPlan(data.code, account);
+        const subscription = await this.lago.subscriptionPlan(
+          data.code,
+          account,
+        );
+        try {
+          await this.producer.purchaseSuccess({
+            userId: account.userId,
+            credits: null,
+            price: null,
+            subscription: subscription,
+          });
+        } catch (error) {
+          this.logger.error(
+            'Kafka emitting even purchaseSuccess failed for subscription',
+            error,
+          );
+        }
       }
       return { message: 'Successfully initialized barcodes buy' };
     } catch (error) {
