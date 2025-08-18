@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from './services/prisma.service';
-import { KafkaService } from './services/kafka.service';
+import { LagoService } from './services/lago.service';
 
 @Module({
-  providers: [PrismaService, KafkaService],
-  exports: [PrismaService, KafkaService],
+  providers: [PrismaService, LagoService],
+  exports: [PrismaService, LagoService],
 })
 export class SharedModule {}
