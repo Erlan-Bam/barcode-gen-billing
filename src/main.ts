@@ -11,6 +11,7 @@ export const groupId = process.env.KAFKA_GROUP_ID;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix('api');
   const logger = new Logger('Bootstrap');
 
   const kafkaEnabled = process.env.KAFKA_ENABLED === 'true';
