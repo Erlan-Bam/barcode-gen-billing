@@ -25,36 +25,10 @@ export class BarcodeGenConsumer {
   ) {
     try {
       const { key, headers } = this.getMeta(context);
-      const [account, product] = await this.prisma.$transaction([
-        this.prisma.account.findUnique({
-          where: { userId: data.userId },
-        }),
-        this.prisma.product.findFirst({
-          where: {
-            name: {
-              contains: 'barcode',
-              mode: 'insensitive',
-            },
-          },
-        }),
-      ]);
-      type PackageItem = { credits: number; price: number };
-
-      let packages: PackageItem[];
-      try {
-        const raw = product.packages;
-
-        if (typeof raw === 'string') {
-          packages = JSON.parse(raw) as PackageItem[];
-        } else {
-          packages = raw as unknown as PackageItem[];
-        }
-      } catch (error) {
-        this.logger.error(
-          `Error parsing packages for product: ${product.name}`,
-        );
-        return;
-      }
+      const account = await this.prisma.account.findUnique({
+        where: { userId: data.userId },
+      });
+      const { packages, product } = await this.prisma.getBarcodePackages();
       if (packages.length === 0) {
         this.logger.error(`Package is empty for product=${product.name}`);
       }
@@ -73,34 +47,40 @@ export class BarcodeGenConsumer {
       this.logger.log(
         `[barcode.new] key=${key} id=${data?.id} headers=${JSON.stringify(headers)}`,
       );
-    } catch (error) {}
+    } catch (error) {
+      this.logger.error(`[barcode.new] id=${data?.id} error=${error}`);
+    }
   }
 
   @EventPattern('barcode.edit')
   async handleEdited(@Payload() data: Barcode, @Ctx() context: KafkaContext) {
-    const { key, headers } = this.getMeta(context);
+    try {
+      const { key, headers } = this.getMeta(context);
 
-    const account = await this.prisma.account.findUnique({
-      where: { userId: data.userId },
-    });
+      const account = await this.prisma.account.findUnique({
+        where: { userId: data.userId },
+      });
 
-    if (!account) {
-      this.logger.warn(`[barcode.edit] No account for userId=${data.userId}`);
-      return;
-    }
+      if (!account) {
+        this.logger.warn(`[barcode.edit] No account for userId=${data.userId}`);
+        return;
+      }
 
-    const isSubscribed = await this.lago.hasActiveSubscription(account);
-    if (isSubscribed) {
-      return;
-    } else {
-      this.logger.warn(
-        `[barcode.edit] User is not subscribed userId=${data.userId}`,
+      const isSubscribed = await this.lago.hasActiveSubscription(account);
+      if (isSubscribed) {
+        return;
+      } else {
+        this.logger.warn(
+          `[barcode.edit] User is not subscribed userId=${data.userId}`,
+        );
+      }
+
+      this.logger.log(
+        `[barcode.edit] key=${key} id=${data?.id} headers=${JSON.stringify(headers)}`,
       );
+    } catch (error) {
+      this.logger.error(`[barcode.edit] id=${data?.id} error=${error}`);
     }
-
-    this.logger.log(
-      `[barcode.edit] key=${key} id=${data?.id} headers=${JSON.stringify(headers)}`,
-    );
   }
 
   private getMeta(context: KafkaContext) {

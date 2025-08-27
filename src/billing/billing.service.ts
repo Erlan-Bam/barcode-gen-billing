@@ -21,21 +21,14 @@ export class BillingService {
         this.prisma.account.findUnique({
           where: { userId: data.userId },
         }),
-        this.prisma.product.findFirst({
-          where: {
-            name: {
-              contains: 'barcode',
-              mode: 'insensitive',
-            },
-          },
-        }),
+        this.prisma.product.findFirst(),
       ]);
       if (!product) {
         this.logger.error(`Product with name barcode was not found`);
         throw new HttpException('Product not found', 500);
       }
 
-      const { packages } = await this.getPackages(product);
+      const { packages } = await this.prisma.getBarcodePackages();
       if (data.index < 0 || data.index >= packages.length) {
         throw new HttpException('Invalid package index is out of scope', 400);
       }
@@ -95,7 +88,7 @@ export class BillingService {
       }
       return { message: 'Successfully initialized barcodes buy' };
     } catch (error) {
-      if (error instanceof HttpException) return error;
+      if (error instanceof HttpException) throw error;
       this.logger.error('Error occured in buy barcodes:', error);
       throw new HttpException('Something went wrong', 500);
     }
@@ -126,13 +119,7 @@ export class BillingService {
       }
       let basePrice = 0;
       if (data.packageIndex) {
-        const { packages } = await this.getPackages(product);
-        if (data.packageIndex < 0 || data.packageIndex >= packages.length) {
-          throw new HttpException(
-            'Invalid package packageIndex is out of scope',
-            400,
-          );
-        }
+        const { packages } = await this.prisma.getBarcodePackages();
         if (data.packageIndex < 0 || data.packageIndex >= packages.length) {
           throw new HttpException(
             'Invalid package packageIndex is out of scope',
@@ -154,7 +141,8 @@ export class BillingService {
         if (coupon.type === 'fixed_amount') {
           totalPrice = Math.max(0, basePrice - coupon.amountCents / 100);
         } else {
-          totalPrice = basePrice * (100 - parseFloat(coupon.percentageRate));
+          totalPrice =
+            basePrice * (1 - parseFloat(coupon.percentageRate) / 100);
         }
         appliedCoupon = coupon;
       }
@@ -165,30 +153,9 @@ export class BillingService {
         coupon: appliedCoupon,
       };
     } catch (error) {
-      if (error instanceof HttpException) return error;
+      if (error instanceof HttpException) throw error;
       this.logger.error('Error occured in buy barcodes:', error);
       throw new HttpException('Something went wrong', 500);
     }
-  }
-
-  async getPackages(product: Product) {
-    type PackageItem = { credits: number; price: number };
-
-    let packages: PackageItem[];
-    try {
-      const raw = product.packages;
-
-      if (typeof raw === 'string') {
-        packages = JSON.parse(raw) as PackageItem[];
-      } else {
-        packages = raw as unknown as PackageItem[];
-      }
-    } catch (error) {
-      throw new HttpException(
-        `Error parsing packages for product: ${product.name}`,
-        500,
-      );
-    }
-    return { packages: packages };
   }
 }

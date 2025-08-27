@@ -292,11 +292,7 @@ export class LagoService {
 
   async deleteCustomer(customerId: string) {
     try {
-      const { data } = await this.lago.customers.createCustomer({
-        customer: {
-          external_id: customerId,
-        },
-      });
+      const { data } = await this.lago.customers.destroyCustomer(customerId);
       return data.customer;
     } catch (error) {
       this.logger.error(

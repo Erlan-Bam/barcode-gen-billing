@@ -14,7 +14,7 @@ export class ProductService {
       data: {
         name: data.name,
         description: data.description,
-        packages: JSON.stringify(data.packages),
+        packages: this.prisma.packagesToJSON(data.packages),
       },
     });
   }
@@ -62,7 +62,7 @@ export class ProductService {
       data: {
         ...rest,
         ...(packages !== undefined && {
-          packages: JSON.stringify(packages),
+          packages: this.prisma.packagesToJSON(data.packages),
         }),
       },
     });

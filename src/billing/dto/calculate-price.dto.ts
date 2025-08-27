@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CalculatePriceDto {
-  @IsInt()
+  @IsUUID()
   productId: string;
 
   @IsOptional()
@@ -11,9 +11,11 @@ export class CalculatePriceDto {
   packageIndex?: number;
 
   @IsString()
+  @IsOptional()
   couponCode: string;
 
   @IsString()
+  @IsOptional()
   planCode: string;
 
   userId: string;
