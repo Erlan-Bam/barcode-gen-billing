@@ -404,7 +404,6 @@ export class LagoService {
     const per_page = 100;
     let count = 0,
       list: CouponObject[] = [];
-    const now = Date.now();
 
     while (true) {
       const { data } = await this.lago.coupons.findAllCoupons({
