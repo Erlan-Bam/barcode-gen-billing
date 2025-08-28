@@ -9,7 +9,9 @@ import {
 import { ClientKafka } from '@nestjs/microservices';
 import { Barcode } from '../dto/barcode.dto';
 import {
+  CouponObject,
   Subscription,
+  SubscriptionObject,
   SubscriptionObjectExtended,
 } from 'lago-javascript-client';
 
@@ -78,6 +80,37 @@ export class BillingProducer implements OnModuleInit {
       source: 'billing-service',
       timestamp: Date.now().toString(),
     });
+  }
+  async subscriptionTerminated(subscription: SubscriptionObject) {
+    this.ensureReady();
+    try {
+      await this.emit('billing.subscription.terminated', subscription, {
+        eventType: 'billing.subscription.terminated',
+        source: 'billing-service',
+        timestamp: Date.now().toString(),
+      });
+    } catch (error) {
+      this.logger.error(
+        `Emit failed for subscription terminated event ${error}`,
+      );
+    }
+  }
+
+  async couponTerminated(coupon: CouponObject) {
+    this.ensureReady();
+    try {
+      await this.emit(
+        'billing.coupon.terminated',
+        { coupon: coupon, message: 'This coupon is expired' },
+        {
+          eventType: 'billing.coupon.terminated',
+          source: 'billing-service',
+          timestamp: Date.now().toString(),
+        },
+      );
+    } catch (error) {
+      this.logger.error(`Emit failed for coupon terminated event ${error}`);
+    }
   }
 
   async emit(topic: string, payload: unknown, headers: Headers = {}) {

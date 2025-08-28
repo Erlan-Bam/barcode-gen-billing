@@ -12,13 +12,17 @@ import { User } from 'src/shared/decorator/user.decorator';
 import { BuyBarcodesDto } from './dto/buy-barcodes.dto';
 import { BillingService } from './billing.service';
 import { CalculatePriceDto } from './dto/calculate-price.dto';
+import { BillingProducer } from 'src/kafka/producers/billing.producer';
 
 @Controller('billing')
 @UseGuards(AuthGuard('jwt'))
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
 
-  constructor(private billingService: BillingService) {}
+  constructor(
+    private billingService: BillingService,
+    private producer: BillingProducer,
+  ) {}
 
   @Post('barcodes/buy')
   async buyBarcodes(@User('id') userId: string, @Body() data: BuyBarcodesDto) {
@@ -71,6 +75,18 @@ export class BillingController {
       return result;
     } catch (error) {
       this.logger.error(`checkCredits failed for userId=${userId}`, error);
+      throw error;
+    }
+  }
+
+  @Get('check/subscription')
+  async checkSubscription(@User('id') userId: string) {
+    try {
+      const result = await this.billingService.checkSubscription(userId);
+      this.logger.log(`checkSubscription success for userId=${userId}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`checkSubscription failed for userId=${userId}`, error);
       throw error;
     }
   }

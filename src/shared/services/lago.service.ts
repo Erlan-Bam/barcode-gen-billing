@@ -1,6 +1,11 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { Account } from '@prisma/client';
-import { Client, CouponObject, getLagoError } from 'lago-javascript-client';
+import {
+  Client,
+  CouponObject,
+  getLagoError,
+  SubscriptionObject,
+} from 'lago-javascript-client';
 
 @Injectable()
 export class LagoService {
@@ -89,7 +94,7 @@ export class LagoService {
       if (lagoError?.error === 'Not Found') {
         throw new HttpException('Plan not found', 404);
       } else {
-        this.logger.error('Error occured in barcode add ons', error);
+        this.logger.error('Error occured in subscription plan', error);
         throw new HttpException('Bad request', 400);
       }
     }
@@ -105,6 +110,26 @@ export class LagoService {
         error,
       );
       throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async getSubscription(account: Account) {
+    try {
+      const { data } = await this.lago.subscriptions.findSubscription(
+        account.id,
+      );
+      return { subscription: data.subscription };
+    } catch (error) {
+      const lagoError =
+        await getLagoError<typeof this.lago.subscriptions.findSubscription>(
+          error,
+        );
+      if (lagoError?.error === 'Not Found') {
+        throw new HttpException('Plan not found', 404);
+      } else {
+        this.logger.error('Error occured in get subscription', error);
+        throw new HttpException('Bad request', 400);
+      }
     }
   }
 
@@ -303,5 +328,141 @@ export class LagoService {
         `Error occured during customer creation for customerId=${customerId}`,
       );
     }
+  }
+
+  async terminateExpiredSubscriptions(): Promise<{
+    count: number;
+    list: SubscriptionObject[];
+  }> {
+    let page = 1;
+    const per_page = 100;
+    let count = 0,
+      list: SubscriptionObject[] = [];
+    const now = Date.now();
+
+    while (true) {
+      const { data } = await this.lago.subscriptions.findAllSubscriptions({
+        page,
+        per_page,
+        'status[]': ['active', 'pending'],
+      });
+
+      const subs: SubscriptionObject[] = data.subscriptions ?? [];
+      if (subs.length === 0) break;
+
+      for (const sub of subs) {
+        try {
+          if (!sub.ending_at) continue;
+          const endsAt = Date.parse(sub.ending_at);
+          if (Number.isNaN(endsAt)) {
+            this.logger.warn(
+              `Subscription ${sub.external_id} has invalid ending_at=${sub.ending_at}`,
+            );
+            continue;
+          }
+          if (endsAt > now) continue;
+
+          await this.lago.subscriptions.destroySubscription(sub.external_id, {
+            on_termination_invoice: 'generate',
+          });
+
+          count++;
+          list.push(sub);
+          this.logger.log(
+            `Terminated subscription external_id=${sub.external_id} (status=${sub.status}, ending_at=${sub.ending_at})`,
+          );
+        } catch (error) {
+          const lagoError =
+            await getLagoError<
+              typeof this.lago.subscriptions.destroySubscription
+            >(error);
+          if (lagoError) {
+            this.logger.error(
+              `Failed terminating subscription external_id=${sub.external_id}: ${lagoError.error} (${lagoError.status})`,
+            );
+          } else {
+            this.logger.error(
+              `Unexpected error terminating subscription external_id=${sub.external_id}`,
+              error,
+            );
+          }
+        }
+      }
+
+      if (subs.length < per_page) break;
+      page++;
+    }
+
+    return { count: count, list: list };
+  }
+
+  async terminateExpiredCoupons(): Promise<{
+    count: number;
+    list: CouponObject[];
+  }> {
+    let page = 1;
+    const per_page = 100;
+    let count = 0,
+      list: CouponObject[] = [];
+    const now = Date.now();
+
+    while (true) {
+      const { data } = await this.lago.coupons.findAllCoupons({
+        page,
+        per_page,
+      });
+
+      const coupons: CouponObject[] = data.coupons ?? [];
+      if (coupons.length === 0) break;
+
+      for (const coupon of coupons) {
+        try {
+          if (coupon.terminated_at) continue;
+
+          const endsAt =
+            coupon.expiration === 'time_limit' && coupon.expiration_at
+              ? Date.parse(coupon.expiration_at)
+              : undefined;
+
+          if (endsAt !== undefined && Number.isNaN(endsAt)) {
+            this.logger.warn(
+              `Coupon ${coupon.code} has invalid expiration_at=${coupon.expiration_at}`,
+            );
+            continue;
+          }
+
+          if (!this.isExpired(coupon)) {
+            continue;
+          }
+
+          await this.lago.coupons.destroyCoupon(coupon.code);
+
+          count++;
+          list.push(coupon);
+          this.logger.log(
+            `Terminated coupon code=${coupon.code} (name=${coupon.name ?? '—'}, expiration=${coupon.expiration}, expiration_at=${coupon.expiration_at ?? '—'})`,
+          );
+        } catch (error) {
+          const lagoError =
+            await getLagoError<typeof this.lago.coupons.destroyCoupon>(error);
+
+          if (lagoError) {
+            this.logger.error(
+              `Failed terminating coupon code=${coupon.code}: ${lagoError.error} (${lagoError.status})`,
+            );
+          } else {
+            this.logger.error(
+              `Unexpected error terminating coupon code=${coupon.code}`,
+              error,
+            );
+          }
+        }
+      }
+
+      if (coupons.length < per_page) break;
+      page++;
+    }
+
+    return { count, list };
   }
 }

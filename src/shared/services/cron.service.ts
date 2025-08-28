@@ -14,4 +14,30 @@ export class CronService {
     private readonly lago: LagoService,
     private readonly producer: BillingProducer,
   ) {}
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async terminateExpiredSubscriptions() {
+    try {
+      const { count, list } = await this.lago.terminateExpiredSubscriptions();
+      for (const subscription of list) {
+        await this.producer.subscriptionTerminated(subscription);
+      }
+      this.logger.log(`Terminated ${count} expired subscriptions.`);
+    } catch (error) {
+      this.logger.error('Error terminating expired subscriptions', error);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async terminateExpiredCoupons() {
+    try {
+      const { count, list } = await this.lago.terminateExpiredCoupons();
+      for (const coupon of list) {
+        await this.producer.couponTerminated(coupon);
+      }
+      this.logger.log(`Terminated ${count} expired coupons.`);
+    } catch (error) {
+      this.logger.error('Error terminating expired coupons', error);
+    }
+  }
 }

@@ -16,6 +16,9 @@ export class BillingService {
     private producer: BillingProducer,
   ) {}
   async buyBarcodes(data: BuyBarcodesDto) {
+    let credits = null,
+      price = null,
+      sub = null;
     try {
       const [account, product] = await this.prisma.$transaction([
         this.prisma.account.findUnique({
@@ -40,12 +43,14 @@ export class BillingService {
         throw new HttpException('Account not found', 404);
       }
       if (data.type === BuyType.SINGLE) {
-        await this.lago.topUpWallet(packages[0].credits, account);
+        credits = packages[0].credits;
+        price = packages[0].price;
+        await this.lago.topUpWallet(credits, account);
         try {
           await this.producer.purchaseSuccess({
             userId: account.userId,
-            credits: packages[0].credits,
-            price: packages[0].price,
+            credits: credits,
+            price: price,
           });
         } catch (error) {
           this.logger.error(
@@ -54,12 +59,14 @@ export class BillingService {
           );
         }
       } else if (data.type === BuyType.PACKAGE) {
-        await this.lago.topUpWallet(packages[data.index].credits, account);
+        credits = packages[data.index].credits;
+        price = packages[data.index].price;
+        await this.lago.topUpWallet(credits, account);
         try {
           await this.producer.purchaseSuccess({
             userId: account.userId,
-            credits: packages[data.index].credits,
-            price: packages[data.index].price,
+            credits: credits,
+            price: price,
           });
         } catch (error) {
           this.logger.error(
@@ -72,6 +79,7 @@ export class BillingService {
           data.code,
           account,
         );
+        sub = subscription;
         try {
           await this.producer.purchaseSuccess({
             userId: account.userId,
@@ -88,9 +96,18 @@ export class BillingService {
       }
       return { message: 'Successfully initialized barcodes buy' };
     } catch (error) {
-      if (error instanceof HttpException) throw error;
-      this.logger.error('Error occured in buy barcodes:', error);
-      throw new HttpException('Something went wrong', 500);
+      try {
+        await this.producer.purchaseFailed({
+          userId: data.userId,
+          credits: credits,
+          price: price,
+          subscription: sub,
+        });
+      } finally {
+        if (error instanceof HttpException) throw error;
+        this.logger.error('Error occured in buy barcodes:', error);
+        throw new HttpException('Something went wrong', 500);
+      }
     }
   }
 
@@ -103,6 +120,17 @@ export class BillingService {
       throw new HttpException('Account not found', 404);
     }
     return await this.lago.getCredits(account);
+  }
+
+  async checkSubscription(userId: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { userId: userId },
+    });
+    if (!account) {
+      this.logger.debug(`Account for user with id: ${userId} was not found!`);
+      throw new HttpException('Account not found', 404);
+    }
+    return await this.lago.getSubscription(account);
   }
 
   async checkCoupon(code: string) {
