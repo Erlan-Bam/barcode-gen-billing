@@ -1,22 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Prisma, Product } from '@prisma/client';
 import { GetProductsDto } from './dto/get-products.dto';
+import { ProductProducer } from 'src/kafka/producers/product.producer';
 
 @Injectable()
 export class ProductService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ProductService.name);
+  constructor(
+    private prisma: PrismaService,
+    private producer: ProductProducer,
+  ) {}
 
   async create(data: CreateProductDto): Promise<Product> {
-    return await this.prisma.product.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        packages: this.prisma.packagesToJSON(data.packages),
-      },
-    });
+    try {
+      const product = await this.prisma.product.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          packages: this.prisma.packagesToJSON(data.packages),
+        },
+      });
+      this.logger.error(`Created a product ${product}`);
+      return product;
+    } catch (error) {
+      this.logger.error(`Error creating a product ${error}`);
+    }
   }
 
   async findAll(query: GetProductsDto) {
@@ -55,17 +66,23 @@ export class ProductService {
   }
 
   async update(id: string, data: UpdateProductDto): Promise<Product> {
-    const { packages, ...rest } = data;
+    try {
+      const { packages, ...rest } = data;
 
-    return await this.prisma.product.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(packages !== undefined && {
-          packages: this.prisma.packagesToJSON(data.packages),
-        }),
-      },
-    });
+      const product = await this.prisma.product.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(packages !== undefined && {
+            packages: this.prisma.packagesToJSON(data.packages),
+          }),
+        },
+      });
+      await this.producer.productUpdated(product);
+      return product;
+    } catch (error) {
+      this.logger.error(`Error updating a product ${error}`);
+    }
   }
 
   async remove(id: string): Promise<Product> {

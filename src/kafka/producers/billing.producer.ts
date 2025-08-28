@@ -15,8 +15,6 @@ import {
   SubscriptionObjectExtended,
 } from 'lago-javascript-client';
 
-type Headers = Record<string, string>;
-
 @Injectable()
 export class BillingProducer implements OnModuleInit {
   private readonly logger = new Logger(BillingProducer.name);
@@ -26,6 +24,8 @@ export class BillingProducer implements OnModuleInit {
   private topics = {
     purchaseSuccess: 'billing.purchase.success',
     purchaseFailed: 'billing.purchase.failed',
+    subscriptionTerminated: 'billing.subscription.terminated',
+    couponTerminated: 'billing.coupon.terminated',
   };
 
   constructor(@Inject('KAFKA_BILLING') private readonly client: ClientKafka) {}
@@ -84,8 +84,8 @@ export class BillingProducer implements OnModuleInit {
   async subscriptionTerminated(subscription: SubscriptionObject) {
     this.ensureReady();
     try {
-      await this.emit('billing.subscription.terminated', subscription, {
-        eventType: 'billing.subscription.terminated',
+      await this.emit(this.topics.subscriptionTerminated, subscription, {
+        eventType: this.topics.subscriptionTerminated,
         source: 'billing-service',
         timestamp: Date.now().toString(),
       });
@@ -99,21 +99,17 @@ export class BillingProducer implements OnModuleInit {
   async couponTerminated(coupon: CouponObject) {
     this.ensureReady();
     try {
-      await this.emit(
-        'billing.coupon.terminated',
-        { coupon: coupon, message: 'This coupon is expired' },
-        {
-          eventType: 'billing.coupon.terminated',
-          source: 'billing-service',
-          timestamp: Date.now().toString(),
-        },
-      );
+      await this.emit(this.topics.couponTerminated, coupon, {
+        eventType: this.topics.couponTerminated,
+        source: 'billing-service',
+        timestamp: Date.now().toString(),
+      });
     } catch (error) {
       this.logger.error(`Emit failed for coupon terminated event ${error}`);
     }
   }
 
-  async emit(topic: string, payload: unknown, headers: Headers = {}) {
+  async emit(topic: string, payload: unknown, headers: Record<string, string>) {
     this.ensureReady();
     try {
       this.client.emit(topic, { value: JSON.stringify(payload), headers });
