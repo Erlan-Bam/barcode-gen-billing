@@ -4,7 +4,7 @@ import { PrismaService } from 'src/shared/services/prisma.service';
 import { BuyBarcodesDto, BuyType } from './dto/buy-barcodes.dto';
 import { CalculatePriceDto } from './dto/calculate-price.dto';
 import { Product } from '@prisma/client';
-import { CouponObject } from 'lago-javascript-client';
+import { CouponObject, PlanObject } from 'lago-javascript-client';
 import { BillingProducer } from 'src/kafka/producers/billing.producer';
 
 @Injectable()
@@ -157,13 +157,15 @@ export class BillingService {
 
         basePrice += packages[data.packageIndex].price;
       }
+      let appliedPlan: Partial<PlanObject> = null;
       if (data.planCode) {
         const { plan } = await this.lago.checkPlan(data.planCode);
         basePrice += plan.amountCents / 100;
+        appliedPlan = plan;
       }
 
       let totalPrice = basePrice;
-      let appliedCoupon = null;
+      let appliedCoupon: Partial<CouponObject> = null;
       if (data.couponCode) {
         const { coupon } = await this.lago.checkCoupon(data.couponCode);
         if (coupon.type === 'fixed_amount') {
@@ -178,7 +180,23 @@ export class BillingService {
       return {
         totalPrice: totalPrice,
         basePrice: basePrice,
-        coupon: appliedCoupon,
+        discount: {
+          amount: appliedCoupon.amount_cents / 100 || null,
+          rate: appliedCoupon.percentage_rate || null,
+          description: appliedCoupon.description || null,
+        },
+        breakdown: [
+          { product: product.name },
+          {
+            coupon: appliedCoupon.name,
+            price: appliedCoupon.amount_cents / 100 || null,
+            rate: appliedCoupon.percentage_rate,
+          },
+          {
+            subscription: appliedPlan.name,
+            price: appliedPlan.amount_cents / 100 || null,
+          },
+        ],
       };
     } catch (error) {
       if (error instanceof HttpException) throw error;

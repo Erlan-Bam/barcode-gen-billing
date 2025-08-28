@@ -44,7 +44,7 @@ export class AppController {
       kafka = 'error';
     }
 
-    const allOk = [db, kafka, lago].every((x) => x === 'ok');
+    const allOk = [db].every((x) => x === 'ok');
     const status = allOk ? 'ready' : 'error';
 
     if (!allOk) {
@@ -54,6 +54,6 @@ export class AppController {
       );
     }
 
-    return { status, database: db, kafka };
+    return { status, database: db, kafka: kafka, lago: lago };
   }
 }
