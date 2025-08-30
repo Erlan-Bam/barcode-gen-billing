@@ -22,6 +22,7 @@ import { brokers, clientId } from 'src/main';
             retry: { retries: 2, initialRetryTime: 300, factor: 2 },
           },
           producer: {
+            idempotent: true,
             allowAutoTopicCreation: true,
           },
         },

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
 import { Product } from '@prisma/client';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class ProductProducer implements OnModuleInit {
@@ -39,7 +40,7 @@ export class ProductProducer implements OnModuleInit {
   async productUpdated(product: Product) {
     this.ensureReady();
     try {
-      await this.emit(this.topics.productUpdated, product, {
+      await this.emit(this.topics.productUpdated, product.id, product, {
         eventType: this.topics.productUpdated,
         source: 'billing-service',
         timestamp: Date.now().toString(),
@@ -49,10 +50,21 @@ export class ProductProducer implements OnModuleInit {
     }
   }
 
-  async emit(topic: string, payload: unknown, headers: Record<string, string>) {
+  async emit(
+    topic: string,
+    key: string,
+    payload: any,
+    headers: Record<string, string>,
+  ) {
     this.ensureReady();
     try {
-      this.client.emit(topic, { value: JSON.stringify(payload), headers });
+      await lastValueFrom(
+        this.client.emit(topic, {
+          key: key,
+          value: JSON.stringify({ ...payload, transactionId: key }),
+          headers: { ...headers, 'idempotency-key': key },
+        }),
+      );
       this.logger.debug(
         `Emitted event "${topic}" with payload=${JSON.stringify(payload)}`,
       );

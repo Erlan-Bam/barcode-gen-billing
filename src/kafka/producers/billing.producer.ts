@@ -1,19 +1,12 @@
-// src/kafka/producers/billing.producer.ts
-import {
-  HttpException,
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
-import { Barcode } from '../dto/barcode.dto';
 import {
   CouponObject,
   Subscription,
   SubscriptionObject,
   SubscriptionObjectExtended,
 } from 'lago-javascript-client';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class BillingProducer implements OnModuleInit {
@@ -60,7 +53,7 @@ export class BillingProducer implements OnModuleInit {
   }) {
     this.ensureReady();
 
-    return await this.emit(this.topics.purchaseSuccess, data, {
+    return await this.emit(this.topics.purchaseSuccess, null, data, {
       eventType: this.topics.purchaseSuccess,
       source: 'billing-service',
       timestamp: Date.now().toString(),
@@ -75,7 +68,7 @@ export class BillingProducer implements OnModuleInit {
   }) {
     this.ensureReady();
 
-    return await this.emit(this.topics.purchaseFailed, data, {
+    return await this.emit(this.topics.purchaseFailed, null, data, {
       eventType: this.topics.purchaseFailed,
       source: 'billing-service',
       timestamp: Date.now().toString(),
@@ -84,11 +77,16 @@ export class BillingProducer implements OnModuleInit {
   async subscriptionTerminated(subscription: SubscriptionObject) {
     this.ensureReady();
     try {
-      await this.emit(this.topics.subscriptionTerminated, subscription, {
-        eventType: this.topics.subscriptionTerminated,
-        source: 'billing-service',
-        timestamp: Date.now().toString(),
-      });
+      await this.emit(
+        this.topics.subscriptionTerminated,
+        subscription.lago_id,
+        subscription,
+        {
+          eventType: this.topics.subscriptionTerminated,
+          source: 'billing-service',
+          timestamp: Date.now().toString(),
+        },
+      );
     } catch (error) {
       this.logger.error(
         `Emit failed for subscription terminated event ${error}`,
@@ -99,7 +97,7 @@ export class BillingProducer implements OnModuleInit {
   async couponTerminated(coupon: CouponObject) {
     this.ensureReady();
     try {
-      await this.emit(this.topics.couponTerminated, coupon, {
+      await this.emit(this.topics.couponTerminated, coupon.lago_id, coupon, {
         eventType: this.topics.couponTerminated,
         source: 'billing-service',
         timestamp: Date.now().toString(),
@@ -109,10 +107,21 @@ export class BillingProducer implements OnModuleInit {
     }
   }
 
-  async emit(topic: string, payload: unknown, headers: Record<string, string>) {
+  async emit(
+    topic: string,
+    key: string = null,
+    payload: any,
+    headers: Record<string, string>,
+  ) {
     this.ensureReady();
     try {
-      this.client.emit(topic, { value: JSON.stringify(payload), headers });
+      await lastValueFrom(
+        this.client.emit(topic, {
+          key: key,
+          value: JSON.stringify({ ...payload, transactionId: key }),
+          headers: { ...headers, 'idempotency-key': key },
+        }),
+      );
       this.logger.debug(
         `Emitted event "${topic}" with payload=${JSON.stringify(payload)}`,
       );
