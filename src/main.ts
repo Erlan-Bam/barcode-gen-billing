@@ -20,7 +20,6 @@ async function bootstrap() {
       crossOriginResourcePolicy: { policy: 'cross-origin' }, // для Swagger static
     }),
   );
-  app.use(compression());
   app.enableCors({
     origin: ['http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -142,6 +141,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-function compression(): any {
-  throw new Error('Function not implemented.');
-}

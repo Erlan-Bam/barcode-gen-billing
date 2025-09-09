@@ -5,6 +5,7 @@ import { BillingModule } from './billing/billing.module';
 import { ProductModule } from './product/product.module';
 import { KafkaModule } from './kafka/kafka.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { BackgroundModule } from './background/background.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     BillingModule,
     ProductModule,
     KafkaModule,
+    BackgroundModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -5,6 +5,7 @@ import { SharedModule } from 'src/shared/shared.module';
 import { BillingProducer } from './producers/billing.producer';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { brokers, clientId } from 'src/main';
+import { ProductProducer } from './producers/product.producer';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { brokers, clientId } from 'src/main';
     ]),
   ],
   controllers: [BarcodeGenConsumer],
-  providers: [HealthService, BillingProducer],
-  exports: [HealthService, BillingProducer],
+  providers: [HealthService, BillingProducer, ProductProducer],
+  exports: [HealthService, BillingProducer, ProductProducer],
 })
 export class KafkaModule {}

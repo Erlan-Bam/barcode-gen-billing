@@ -16,7 +16,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       host: process.env.REDIS_HOST || '127.0.0.1',
       port: Number(process.env.REDIS_PORT) || 6379,
       password: process.env.REDIS_PASSWORD || undefined,
-      retryStrategy: (times) => Math.min(times * 50, 2000), // retry with backoff
+      retryStrategy: (times) => {
+        if (times >= 10) {
+          return null;
+        }
+        return Math.min(times * 50, 1000);
+      },
     });
 
     this.client.on('connect', () => {

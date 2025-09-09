@@ -4,7 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { LagoService } from 'src/shared/services/lago.service';
 import { BillingProducer } from 'src/kafka/producers/billing.producer';
-import { RedisService } from './redis.service';
+import { RedisService } from '../../shared/services/redis.service';
 
 @Injectable()
 export class CronService {
