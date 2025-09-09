@@ -6,6 +6,7 @@ import { CalculatePriceDto } from './dto/calculate-price.dto';
 import { Product } from '@prisma/client';
 import { CouponObject, PlanObject } from 'lago-javascript-client';
 import { BillingProducer } from 'src/kafka/producers/billing.producer';
+import { RedisService } from 'src/shared/services/redis.service';
 
 @Injectable()
 export class BillingService {
@@ -14,6 +15,7 @@ export class BillingService {
     private prisma: PrismaService,
     private lago: LagoService,
     private producer: BillingProducer,
+    private redis: RedisService,
   ) {}
   async buyBarcodes(data: BuyBarcodesDto) {
     let credits = null,
@@ -139,15 +141,20 @@ export class BillingService {
 
   async calculatePrice(data: CalculatePriceDto) {
     try {
-      const product = await this.prisma.product.findUnique({
-        where: { id: data.productId },
-      });
+      let product: Product;
+      try {
+        product = await this.redis.getProductById(data.productId);
+      } catch {
+        product = await this.prisma.product.findUnique({
+          where: { id: data.productId },
+        });
+      }
       if (!product) {
         throw new HttpException('Product not found', 404);
       }
       let basePrice = 0;
       if (data.packageIndex) {
-        const { packages } = await this.prisma.getBarcodePackages();
+        const { packages } = await this.prisma.extractPackages(product);
         if (data.packageIndex < 0 || data.packageIndex >= packages.length) {
           throw new HttpException(
             'Invalid package packageIndex is out of scope',
@@ -159,7 +166,13 @@ export class BillingService {
       }
       let appliedPlan: Partial<PlanObject> = null;
       if (data.planCode) {
-        const { plan } = await this.lago.checkPlan(data.planCode);
+        let plan = null;
+        try {
+          plan = await this.redis.getPlanByCode(data.planCode);
+        } catch {
+          const { plan: lagoPlan } = await this.lago.checkPlan(data.planCode);
+          plan = lagoPlan;
+        }
         basePrice += plan.amountCents / 100;
         appliedPlan = plan;
       }
@@ -167,7 +180,15 @@ export class BillingService {
       let totalPrice = basePrice;
       let appliedCoupon: Partial<CouponObject> = null;
       if (data.couponCode) {
-        const { coupon } = await this.lago.checkCoupon(data.couponCode);
+        let coupon = null;
+        try {
+          coupon = await this.redis.getCouponByCode(data.couponCode);
+        } catch {
+          const { coupon: lagoCoupon } = await this.lago.checkCoupon(
+            data.couponCode,
+          );
+          coupon = lagoCoupon;
+        }
         if (coupon.type === 'fixed_amount') {
           totalPrice = Math.max(0, basePrice - coupon.amountCents / 100);
         } else {

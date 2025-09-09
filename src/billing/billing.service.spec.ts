@@ -4,6 +4,7 @@ import { LagoService } from 'src/shared/services/lago.service';
 import { PrismaService } from 'src/shared/services/prisma.service';
 import { BillingProducer } from 'src/kafka/producers/billing.producer';
 import { BuyType } from './dto/buy-barcodes.dto';
+import { RedisService } from 'src/shared/services/redis.service';
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -28,9 +29,18 @@ describe('BillingService', () => {
     purchaseSuccess: jest.fn(),
   } as unknown as jest.Mocked<BillingProducer>;
 
+  const redis = {
+    getProductById: jest.fn(),
+  } as unknown as jest.Mocked<RedisService>;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new BillingService(prisma as any, lago as any, producer as any);
+    service = new BillingService(
+      prisma as any,
+      lago as any,
+      producer as any,
+      redis as any,
+    );
   });
 
   // ---------- buyBarcodes ----------

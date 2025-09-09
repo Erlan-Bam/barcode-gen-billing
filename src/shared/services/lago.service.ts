@@ -165,6 +165,30 @@ export class LagoService {
     }
   }
 
+  async getCoupons() {
+    try {
+      const { data } = await this.lago.coupons.findAllCoupons();
+      return {
+        coupons: data.coupons.map((c) => ({
+          name: c.name,
+          description: c.description,
+          code: c.code,
+          type: c.coupon_type,
+          planCodes: c.plan_codes,
+          amountCents: c.amount_cents,
+          reusable: c.reusable,
+          percentageRate: c.percentage_rate,
+          frequency: c.frequency,
+          frequencyDuration: c.frequency_duration,
+          expirationAt: c.expiration_at,
+        })),
+      };
+    } catch (error) {
+      this.logger.error('Error occurred in get coupons', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
   async checkPlan(code: string) {
     try {
       const { data } = await this.lago.plans.findPlan(code);
@@ -188,6 +212,28 @@ export class LagoService {
         throw new HttpException('Coupon not found', 404);
       }
       this.logger.error('Error occurred in check plan', error);
+      throw new HttpException('Bad request', 400);
+    }
+  }
+
+  async getPlans() {
+    try {
+      const { data } = await this.lago.plans.findAllPlans();
+      return {
+        plans: data.plans.map((p) => ({
+          name: p.name,
+          description: p.description,
+          code: p.code,
+          interval: p.interval,
+          payInAdvance: p.pay_in_advance,
+          amountCents: p.amount_cents,
+          amountCurrency: p.amount_currency,
+          trialPeriod: p.trial_period,
+          charges: p.charges,
+        })),
+      };
+    } catch (error) {
+      this.logger.error('Error occurred in get plans', error);
       throw new HttpException('Bad request', 400);
     }
   }
